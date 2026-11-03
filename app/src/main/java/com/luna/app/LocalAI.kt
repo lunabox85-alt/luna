@@ -43,32 +43,63 @@ object LocalAI {
         }
     }
 
-    private fun evalSimple(expr: String): Double {
-        val s = expr.replace(" ", "")
+        private fun evalSimple(expr: String): Double {
+        val s = expr.replace(" ", "").replace(",", ".").replace("×", "*").replace("÷", "/")
+        val nums = mutableListOf<Double>()
+        val ops = mutableListOf<Char>()
         var i = 0
-        fun number(): Double {
-            var start = i
-            while (i < s.length && (s[i].isDigit() || s[i] == '.')) i++
-            return s.substring(start, i).toDouble()
-        }
-        fun term(): Double {
-            var v = if (s[i] == '(') { i++; val r = expr(); if (i < s.length) i++; r } else number()
-            while (i < s.length && (s[i] == '*' || s[i] == '/')) {
-                val op = s[i]; i++
-                val r = if (s[i] == '(') { i++; val x = expr(); if (i < s.length) i++; x } else number()
-                v = if (op == '*') v * r else v / r
+        var neg = false
+        while (i < s.length) {
+            val c = s[i]
+            if (c.isDigit() || c == '.') {
+                var j = i
+                while (j < s.length && (s[j].isDigit() || s[j] == '.')) j++
+                val v = s.substring(i, j).toDouble()
+                nums.add(if (neg) -v else v)
+                neg = false
+                i = j
+            } else if (c == '(') {
+                var depth = 1
+                var j = i + 1
+                while (j < s.length && depth > 0) {
+                    if (s[j] == '(') depth++
+                    if (s[j] == ')') depth--
+                    j++
+                }
+                val v = evalSimple(s.substring(i + 1, j - 1))
+                nums.add(if (neg) -v else v)
+                neg = false
+                i = j
+            } else if (c == '+' || c == '-' || c == '*' || c == '/') {
+                if (c == '-' && nums.size == ops.size) {
+                    neg = !neg
+                } else {
+                    ops.add(c)
+                }
+                i++
+            } else {
+                i++
             }
-            return v
         }
-        fun expr(): Double {
-            var v = term()
-            while (i < s.length && (s[i] == '+' || s[i] == '-')) {
-                val op = s[i]; i++
-                val r = term()
-                v = if (op == '+') v + r else v - r
+        if (nums.isEmpty()) throw Exception("пусто")
+        var k = 0
+        while (k < ops.size) {
+            val op = ops[k]
+            if (op == '*' || op == '/') {
+                val a = nums.removeAt(k)
+                val b = nums.removeAt(k)
+                nums.add(k, if (op == '*') a * b else a / b)
+                ops.removeAt(k)
+            } else {
+                k++
             }
-            return v
         }
-        return expr()
+        var result = nums.removeAt(0)
+        for (op in ops) {
+            val b = nums.removeAt(0)
+            result = if (op == '+') result + b else result - b
+        }
+        return result
     }
 }
+
